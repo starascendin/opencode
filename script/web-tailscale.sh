@@ -15,6 +15,8 @@ if [[ -z "$TS_IP" ]]; then
   exit 1
 fi
 
+TS_DNS=$(tailscale status --self --json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))" 2>/dev/null) || true
+
 # Warn if no password is set — the server will be network-accessible.
 if [[ -z "${OPENCODE_SERVER_PASSWORD:-}" ]]; then
   echo "Warning: OPENCODE_SERVER_PASSWORD is not set."
@@ -24,10 +26,18 @@ if [[ -z "${OPENCODE_SERVER_PASSWORD:-}" ]]; then
 fi
 
 echo "Starting opencode web on Tailscale IP: $TS_IP"
+if [[ -n "$TS_DNS" ]]; then
+  echo "MagicDNS: https://$TS_DNS"
+fi
 echo ""
+
+CORS_ORIGINS="http://${TS_IP}:4096"
+if [[ -n "$TS_DNS" ]]; then
+  CORS_ORIGINS="$CORS_ORIGINS,https://${TS_DNS}"
+fi
 
 exec opencode web \
   --hostname 0.0.0.0 \
   --port 4096 \
-  --cors "http://${TS_IP}:4096" \
+  --cors "$CORS_ORIGINS" \
   "$@"
