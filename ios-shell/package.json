@@ -7,11 +7,12 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "web:ensure": "mkdir -p www && test -f www/index.html || printf '<!doctype html>\\n<html lang=\"en\">\\n  <head>\\n    <meta charset=\"utf-8\" />\\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\\n    <title>OpenCode</title>\\n  </head>\\n  <body></body>\\n</html>\\n' > www/index.html",
     "web:build": "rm -rf www && mkdir -p www && VITE_OPENCODE_SERVER_URL=\"${VITE_OPENCODE_SERVER_URL:-https://vps-60d9e960.tail05d28.ts.net:4096}\" bun --cwd ../packages/app build && cp -R ../packages/app/dist/. www/",
+    "web:mirror": "node script/web-mirror.mjs",
     "cap:use:remote": "cp capacitor.config.remote.json capacitor.config.json",
     "cap:use:static": "cp capacitor.config.static.json capacitor.config.json",
     "cap:fix:ios26": "perl -0pi -e 's#// swift-tools-version: [0-9.]+#// swift-tools-version: 6.2#g' ios/App/CapApp-SPM/Package.swift",
     "cap:sync:ios": "npm run cap:use:remote && npm run web:ensure && npx cap sync ios && npm run cap:fix:ios26",
-    "cap:sync:ios:static": "npm run cap:use:static && npm run web:build && npx cap sync ios && npm run cap:fix:ios26",
+    "cap:sync:ios:static": "npm run cap:use:static && (npm run web:build || npm run web:mirror) && npx cap sync ios && npm run cap:fix:ios26",
     "cap:open:ios": "npx cap open ios",
     "cap:run:ios": "npx cap run ios"
   },
