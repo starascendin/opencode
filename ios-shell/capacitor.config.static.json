@@ -1,0 +1,8 @@
+{
+  "appId": "ai.opencode.mobile",
+  "appName": "OpenCode",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "always"
+  }
+}

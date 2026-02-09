@@ -17,16 +17,24 @@ fi
 
 TS_DNS=$(tailscale status --self --json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))" 2>/dev/null) || true
 
-# Locate TLS certs
-CERT_DIR="/etc/tailscale/certs"
+# Locate/generate TLS certs in a user-writable path.
+CERT_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/opencode/tailscale-certs"
 TLS_ARGS=()
-if [[ -n "$TS_DNS" && -f "$CERT_DIR/$TS_DNS.crt" && -f "$CERT_DIR/$TS_DNS.key" ]]; then
-  TLS_ARGS=(--tls-cert "$CERT_DIR/$TS_DNS.crt" --tls-key "$CERT_DIR/$TS_DNS.key")
-else
-  echo "Warning: TLS certs not found at $CERT_DIR/"
-  echo "         Run: sudo tailscale cert --cert-file $CERT_DIR/\$HOSTNAME.crt --key-file $CERT_DIR/\$HOSTNAME.key \$HOSTNAME"
-  echo "         Falling back to HTTP."
-  echo ""
+if [[ -n "$TS_DNS" ]]; then
+  mkdir -p "$CERT_DIR"
+  CERT_FILE="$CERT_DIR/$TS_DNS.crt"
+  KEY_FILE="$CERT_DIR/$TS_DNS.key"
+  if [[ ! -s "$CERT_FILE" || ! -s "$KEY_FILE" ]]; then
+    tailscale cert --cert-file "$CERT_FILE" --key-file "$KEY_FILE" "$TS_DNS" >/dev/null 2>&1 || true
+  fi
+  if [[ -s "$CERT_FILE" && -s "$KEY_FILE" ]]; then
+    TLS_ARGS=(--tls-cert "$CERT_FILE" --tls-key "$KEY_FILE")
+  else
+    echo "Warning: TLS certs unavailable for $TS_DNS."
+    echo "         Run: tailscale cert --cert-file $CERT_FILE --key-file $KEY_FILE $TS_DNS"
+    echo "         Falling back to HTTP."
+    echo ""
+  fi
 fi
 
 # Warn if no password is set — the server will be network-accessible.
@@ -40,6 +48,7 @@ fi
 CORS_ARGS=(--cors "http://${TS_IP}:4096")
 if [[ -n "$TS_DNS" ]]; then
   CORS_ARGS+=(--cors "https://${TS_DNS}")
+  CORS_ARGS+=(--cors "https://${TS_DNS}:4096")
 fi
 
 echo "Starting opencode web on Tailscale IP: $TS_IP"

@@ -98,6 +98,8 @@ export function AppInterface(props: { defaultUrl?: string; children?: JSX.Elemen
   const defaultServerUrl = () => {
     if (props.defaultUrl) return props.defaultUrl
     if (stored) return stored
+    const envUrl = normalizeServerUrl(import.meta.env.VITE_OPENCODE_SERVER_URL ?? "")
+    if (envUrl) return envUrl
     if (location.hostname.includes("opencode.ai")) return "http://localhost:4096"
     if (import.meta.env.DEV)
       return `http://${import.meta.env.VITE_OPENCODE_SERVER_HOST ?? "localhost"}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
