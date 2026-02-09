@@ -1,0 +1,23 @@
+{
+  "name": "opencode-ios-shell",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "cap:fix:ios26": "perl -0pi -e 's#// swift-tools-version: [0-9.]+#// swift-tools-version: 6.2#g' ios/App/CapApp-SPM/Package.swift",
+    "cap:sync:ios": "npx cap sync ios && npm run cap:fix:ios26",
+    "cap:open:ios": "npx cap open ios",
+    "cap:run:ios": "npx cap run ios"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/cli": "^8.0.2",
+    "@capacitor/core": "^8.0.2",
+    "@capacitor/ios": "^8.0.2"
+  },
+  "private": true
+}

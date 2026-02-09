@@ -28,16 +28,18 @@ fi
 echo "Starting opencode web on Tailscale IP: $TS_IP"
 if [[ -n "$TS_DNS" ]]; then
   echo "MagicDNS: https://$TS_DNS"
+  echo "Detected MagicDNS name: $TS_DNS"
+  echo "MagicDNS: https://$TS_DNS"
 fi
 echo ""
 
-CORS_ORIGINS="http://${TS_IP}:4096"
+CORS_ARGS=(--cors "http://${TS_IP}:4096")
 if [[ -n "$TS_DNS" ]]; then
-  CORS_ORIGINS="$CORS_ORIGINS,https://${TS_DNS}"
+  CORS_ARGS+=(--cors "https://${TS_DNS}")
 fi
 
 exec opencode web \
   --hostname 0.0.0.0 \
   --port 4096 \
-  --cors "$CORS_ORIGINS" \
+  "${CORS_ARGS[@]}" \
   "$@"

@@ -1,0 +1,13 @@
+{
+  "appId": "ai.opencode.mobile",
+  "appName": "OpenCode",
+  "webDir": "www",
+  "server": {
+    "url": "https://vps-60d9e960.tail05d28.ts.net",
+    "cleartext": false,
+    "allowNavigation": [
+      "vps-60d9e960.tail05d28.ts.net",
+      "*.tail05d28.ts.net"
+    ]
+  }
+}
