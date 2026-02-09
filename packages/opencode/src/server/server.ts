@@ -569,6 +569,7 @@ export namespace Server {
     mdns?: boolean
     mdnsDomain?: string
     cors?: string[]
+    tls?: { cert: string; key: string }
   }) {
     _corsWhitelist = opts.cors ?? []
 
@@ -577,6 +578,14 @@ export namespace Server {
       idleTimeout: 0,
       fetch: App().fetch,
       websocket: websocket,
+      ...(opts.tls
+        ? {
+            tls: {
+              cert: Bun.file(opts.tls.cert),
+              key: Bun.file(opts.tls.key),
+            },
+          }
+        : {}),
     } as const
     const tryServe = (port: number) => {
       try {

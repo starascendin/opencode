@@ -28,6 +28,14 @@ const options = {
     describe: "additional domains to allow for CORS",
     default: [] as string[],
   },
+  "tls-cert": {
+    type: "string" as const,
+    describe: "path to TLS certificate file for HTTPS",
+  },
+  "tls-key": {
+    type: "string" as const,
+    describe: "path to TLS private key file for HTTPS",
+  },
 }
 
 export type NetworkOptions = InferredOptionTypes<typeof options>
@@ -56,5 +64,9 @@ export async function resolveNetworkOptions(args: NetworkOptions) {
   const argsCors = Array.isArray(args.cors) ? args.cors : args.cors ? [args.cors] : []
   const cors = [...configCors, ...argsCors]
 
-  return { hostname, port, mdns, mdnsDomain, cors }
+  const tlsCert = args["tls-cert"]
+  const tlsKey = args["tls-key"]
+  const tls = tlsCert && tlsKey ? { cert: tlsCert, key: tlsKey } : undefined
+
+  return { hostname, port, mdns, mdnsDomain, cors, tls }
 }

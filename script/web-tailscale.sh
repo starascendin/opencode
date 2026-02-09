@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run opencode web bound to the Tailscale interface so it's accessible
-# from any device on your tailnet.
+# Run opencode web with Tailscale HTTPS via MagicDNS.
+# Uses Tailscale-provisioned TLS certs for native HTTPS.
 
 if ! command -v tailscale &>/dev/null; then
   echo "Error: tailscale is not installed or not in PATH" >&2
@@ -17,6 +17,18 @@ fi
 
 TS_DNS=$(tailscale status --self --json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))" 2>/dev/null) || true
 
+# Locate TLS certs
+CERT_DIR="/etc/tailscale/certs"
+TLS_ARGS=()
+if [[ -n "$TS_DNS" && -f "$CERT_DIR/$TS_DNS.crt" && -f "$CERT_DIR/$TS_DNS.key" ]]; then
+  TLS_ARGS=(--tls-cert "$CERT_DIR/$TS_DNS.crt" --tls-key "$CERT_DIR/$TS_DNS.key")
+else
+  echo "Warning: TLS certs not found at $CERT_DIR/"
+  echo "         Run: sudo tailscale cert --cert-file $CERT_DIR/\$HOSTNAME.crt --key-file $CERT_DIR/\$HOSTNAME.key \$HOSTNAME"
+  echo "         Falling back to HTTP."
+  echo ""
+fi
+
 # Warn if no password is set — the server will be network-accessible.
 if [[ -z "${OPENCODE_SERVER_PASSWORD:-}" ]]; then
   echo "Warning: OPENCODE_SERVER_PASSWORD is not set."
@@ -25,21 +37,27 @@ if [[ -z "${OPENCODE_SERVER_PASSWORD:-}" ]]; then
   echo ""
 fi
 
-echo "Starting opencode web on Tailscale IP: $TS_IP"
-if [[ -n "$TS_DNS" ]]; then
-  echo "MagicDNS: https://$TS_DNS"
-  echo "Detected MagicDNS name: $TS_DNS"
-  echo "MagicDNS: https://$TS_DNS"
-fi
-echo ""
-
 CORS_ARGS=(--cors "http://${TS_IP}:4096")
 if [[ -n "$TS_DNS" ]]; then
   CORS_ARGS+=(--cors "https://${TS_DNS}")
 fi
 
-exec opencode web \
+echo "Starting opencode web on Tailscale IP: $TS_IP"
+if [[ -n "$TS_DNS" ]]; then
+  if [[ ${#TLS_ARGS[@]} -gt 0 ]]; then
+    echo "HTTPS: https://$TS_DNS:4096"
+  else
+    echo "MagicDNS: http://$TS_DNS:4096"
+  fi
+fi
+echo ""
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+exec bun run --cwd "$REPO_DIR/packages/opencode" --conditions=browser src/index.ts web \
   --hostname 0.0.0.0 \
   --port 4096 \
   "${CORS_ARGS[@]}" \
+  "${TLS_ARGS[@]}" \
   "$@"
