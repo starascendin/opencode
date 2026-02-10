@@ -106,6 +106,38 @@ const table = sqliteTable("session", {
 })
 ```
 
+## NPM Scripts
+
+### Claude/Agent Setup
+
+Symlink `AGENTS.md` to `CLAUDE.md` so Claude Code picks it up:
+
+```sh
+bun run setup:claude
+```
+
+### Secrets Management
+
+`.env` files are gitignored. Encrypted `.env*.age` files are safe to commit. Uses `age` with your SSH key.
+
+```sh
+bun run env:encrypt   # encrypt all .env* -> .env*.age
+bun run env:decrypt   # decrypt all .env*.age -> .env*
+```
+
+### Tailscale Web Server
+
+Two flavors, on different ports, both source `.env` for `OPENCODE_SERVER_PASSWORD`:
+
+```sh
+bun run web:tailscale       # local fork (this repo), HTTPS on port 4096
+bun run web:tailscale:cli   # installed opencode CLI, HTTP on port 4097
+```
+
+Use `web:tailscale:cli` for the stable release. Use `web:tailscale` when testing local changes (builds the web app from source with TLS via Tailscale certs).
+
+Both are accessible from `https://app.opencode.ai` — add the server URL shown at startup.
+
 ## Testing
 
 - Avoid mocks as much as possible

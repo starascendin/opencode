@@ -14,7 +14,11 @@
     "random": "echo 'Random script'",
     "hello": "echo 'Hello World!'",
     "test": "echo 'do not run tests from root' && exit 1",
-    "web:tailscale": "./script/web-tailscale.sh"
+    "web:tailscale": "./script/web-tailscale.sh",
+    "web:tailscale:cli": "./script/web-tailscale-cli.sh",
+    "env:encrypt": "for f in .env*; do [ -f \"$f\" ] && [[ \"$f\" != *.age ]] && age -R ~/.ssh/id_ed25519.pub -o \"$f.age\" \"$f\" && echo \"encrypted $f -> $f.age\"; done",
+    "env:decrypt": "for f in .env*.age; do [ -f \"$f\" ] && age -d -i ~/.ssh/id_ed25519 -o \"${f%.age}\" \"$f\" && echo \"decrypted $f -> ${f%.age}\"; done",
+    "setup:claude": "ln -sf AGENTS.md CLAUDE.md && echo 'CLAUDE.md -> AGENTS.md'"
   },
   "workspaces": {
     "packages": [

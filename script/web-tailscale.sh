@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+[[ -f "$REPO_DIR/.env" ]] && set -a && source "$REPO_DIR/.env" && set +a
+
 # Run opencode web with Tailscale HTTPS via MagicDNS.
 # Uses Tailscale-provisioned TLS certs for native HTTPS.
 
@@ -61,8 +65,6 @@ if [[ -n "$TS_DNS" ]]; then
 fi
 echo ""
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
 APP_DIR="$REPO_DIR/packages/app"
 WEB_DIR="$APP_DIR/dist"
 

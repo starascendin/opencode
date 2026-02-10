@@ -3,6 +3,7 @@ node_modules
 .worktrees
 .sst
 .env
+CLAUDE.md
 .idea
 .vscode
 .codex
