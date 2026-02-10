@@ -63,6 +63,23 @@ echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
+APP_DIR="$REPO_DIR/packages/app"
+WEB_DIR="$APP_DIR/dist"
+
+# Determine server URL for the build
+if [[ ${#TLS_ARGS[@]} -gt 0 && -n "$TS_DNS" ]]; then
+  SERVER_URL="https://${TS_DNS}:4096"
+else
+  SERVER_URL="http://${TS_IP}:4096"
+fi
+
+# Build the web app locally
+echo "Building web app..."
+VITE_OPENCODE_SERVER_URL="$SERVER_URL" bun --cwd "$APP_DIR" build
+echo "Web app built."
+echo ""
+
+export OPENCODE_WEB_DIR="$WEB_DIR"
 
 exec bun run --cwd "$REPO_DIR/packages/opencode" --conditions=browser src/index.ts web \
   --hostname 0.0.0.0 \
