@@ -120,6 +120,7 @@ export namespace Server {
 
               return
             },
+            allowHeaders: ["Content-Type", "x-opencode-directory", "Last-Event-ID", "Authorization"],
           }),
         )
         .route("/global", GlobalRoutes())
