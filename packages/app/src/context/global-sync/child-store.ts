@@ -125,7 +125,10 @@ export function createChildStoreManager(input: {
   }
 
   function ensureChild(directory: string) {
-    if (!directory) console.error("No directory provided")
+    if (!directory) {
+      console.error("No directory provided")
+      return undefined
+    }
     if (!children[directory]) {
       const vcs = runWithOwner(input.owner, () =>
         persisted(
@@ -210,6 +213,7 @@ export function createChildStoreManager(input: {
 
   function child(directory: string, options: ChildOptions = {}) {
     const childStore = ensureChild(directory)
+    if (!childStore) throw new Error(`Cannot create child store: no directory provided`)
     pinForOwner(directory)
     const shouldBootstrap = options.bootstrap ?? true
     if (shouldBootstrap && childStore[0].status === "loading") {
@@ -219,7 +223,9 @@ export function createChildStoreManager(input: {
   }
 
   function projectMeta(directory: string, patch: ProjectMeta) {
-    const [store, setStore] = ensureChild(directory)
+    const result = ensureChild(directory)
+    if (!result) return
+    const [store, setStore] = result
     const cached = metaCache.get(directory)
     if (!cached) return
     const previous = store.projectMeta ?? {}
@@ -236,7 +242,9 @@ export function createChildStoreManager(input: {
   }
 
   function projectIcon(directory: string, value: string | undefined) {
-    const [store, setStore] = ensureChild(directory)
+    const result = ensureChild(directory)
+    if (!result) return
+    const [store, setStore] = result
     const cached = iconCache.get(directory)
     if (!cached) return
     if (store.icon === value) return

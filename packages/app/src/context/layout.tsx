@@ -394,7 +394,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       })
     })
 
-    const enriched = createMemo(() => server.projects.list().map(enrich))
+    const enriched = createMemo(() => server.projects.list().filter((p) => p.worktree).map(enrich))
     const list = createMemo(() => {
       const projects = enriched()
       return projects.map((project) => {
@@ -482,7 +482,9 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       projects: {
         list,
         open(directory: string) {
+          if (!directory) return
           const root = rootFor(directory)
+          if (!root) return
           if (server.projects.list().find((x) => x.worktree === root)) return
           globalSync.project.loadSessions(root)
           server.projects.open(root)

@@ -171,6 +171,7 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
       projects: {
         list: projectsList,
         open(directory: string) {
+          if (!directory) return
           const key = origin()
           if (!key) return
           const current = store.projects[key] ?? []

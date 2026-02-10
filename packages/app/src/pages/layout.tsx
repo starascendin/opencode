@@ -1107,6 +1107,7 @@ export default function Layout(props: ParentProps) {
   }
 
   function openProject(directory: string, navigate = true) {
+    if (!directory) return
     layout.projects.open(directory)
     if (navigate) navigateToProject(directory)
   }

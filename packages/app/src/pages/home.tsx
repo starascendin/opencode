@@ -30,6 +30,7 @@ export default function Home() {
   })
 
   function openProject(directory: string) {
+    if (!directory) return
     layout.projects.open(directory)
     server.projects.touch(directory)
     navigate(`/${base64Encode(directory)}`)
