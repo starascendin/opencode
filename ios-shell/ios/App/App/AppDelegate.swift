@@ -6,17 +6,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
-    private func applySafeAreaInsets() {
-        guard let root = window?.rootViewController else { return }
-        let bridge = (root as? CAPBridgeViewController) ??
-            ((root as? UINavigationController)?.viewControllers.first { $0 is CAPBridgeViewController } as? CAPBridgeViewController)
-        guard let webView = bridge?.webView else { return }
-        webView.scrollView.contentInsetAdjustmentBehavior = .always
-    }
-
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
-        applySafeAreaInsets()
         return true
     }
 
@@ -36,7 +27,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-        applySafeAreaInsets()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

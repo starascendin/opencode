@@ -3,6 +3,11 @@
   "appName": "OpenCode",
   "webDir": "www",
   "ios": {
-    "contentInset": "always"
+    "contentInset": "never"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": false
+    }
   }
 }
