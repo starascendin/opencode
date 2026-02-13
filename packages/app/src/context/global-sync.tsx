@@ -285,6 +285,15 @@ function createGlobalSync() {
   })
 
   onCleanup(unsub)
+
+  const unsubReconnect = globalSDK.onReconnect(() => {
+    void bootstrap()
+    for (const directory of Object.keys(children.children)) {
+      void bootstrapInstance(directory)
+    }
+  })
+  onCleanup(unsubReconnect)
+
   onCleanup(() => {
     queue.dispose()
   })

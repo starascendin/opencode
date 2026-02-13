@@ -10,7 +10,6 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
   init: () => {
     const server = useServer()
     const platform = usePlatform()
-    const abort = new AbortController()
 
     const auth = (() => {
       if (typeof window === "undefined") return
@@ -21,11 +20,6 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
       }
     })()
 
-    const eventSdk = createOpencodeClient({
-      baseUrl: server.url,
-      signal: abort.signal,
-      headers: auth,
-    })
     const emitter = createGlobalEmitter<{
       [key: string]: Event
     }>()
@@ -76,33 +70,65 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
       timer = setTimeout(flush, Math.max(0, 16 - elapsed))
     }
 
-    void (async () => {
-      const events = await eventSdk.global.event()
-      let yielded = Date.now()
-      for await (const event of events.stream) {
-        const directory = event.directory ?? "global"
-        const payload = event.payload
-        const k = key(directory, payload)
-        if (k) {
-          const i = coalesced.get(k)
-          if (i !== undefined) {
-            queue[i] = undefined
-          }
-          coalesced.set(k, queue.length)
-        }
-        queue.push({ directory, payload })
-        schedule()
+    let currentAbort = new AbortController()
+    const reconnectListeners = new Set<() => void>()
 
-        if (Date.now() - yielded < 8) continue
-        yielded = Date.now()
-        await new Promise<void>((resolve) => setTimeout(resolve, 0))
-      }
-    })()
-      .finally(flush)
-      .catch(() => undefined)
+    const connectSSE = () => {
+      currentAbort.abort()
+      currentAbort = new AbortController()
+
+      const eventSdk = createOpencodeClient({
+        baseUrl: server.url,
+        signal: currentAbort.signal,
+        headers: auth,
+      })
+
+      void (async () => {
+        const events = await eventSdk.global.event()
+        let yielded = Date.now()
+        for await (const event of events.stream) {
+          const directory = event.directory ?? "global"
+          const payload = event.payload
+          const k = key(directory, payload)
+          if (k) {
+            const i = coalesced.get(k)
+            if (i !== undefined) {
+              queue[i] = undefined
+            }
+            coalesced.set(k, queue.length)
+          }
+          queue.push({ directory, payload })
+          schedule()
+
+          if (Date.now() - yielded < 8) continue
+          yielded = Date.now()
+          await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        }
+      })()
+        .finally(flush)
+        .catch(() => undefined)
+    }
+
+    // Initial connection
+    connectSSE()
+
+    // Reconnect SSE when app returns to foreground (iOS suspends WKWebView on background)
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      reconnectTimer = setTimeout(() => {
+        connectSSE()
+        for (const fn of reconnectListeners) fn()
+      }, 300)
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility)
 
     onCleanup(() => {
-      abort.abort()
+      document.removeEventListener("visibilitychange", handleVisibility)
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      currentAbort.abort()
       flush()
     })
 
@@ -112,6 +138,14 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
       throwOnError: true,
     })
 
-    return { url: server.url, client: sdk, event: emitter }
+    return {
+      url: server.url,
+      client: sdk,
+      event: emitter,
+      onReconnect(fn: () => void) {
+        reconnectListeners.add(fn)
+        return () => reconnectListeners.delete(fn)
+      },
+    }
   },
 })
