@@ -142,3 +142,4 @@ Both are accessible from `https://app.opencode.ai` — add the server URL shown 
 
 - Avoid mocks as much as possible
 - Test actual implementation, do not duplicate logic into tests
+- Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/opencode`.
