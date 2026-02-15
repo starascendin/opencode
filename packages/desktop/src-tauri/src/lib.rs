@@ -737,6 +737,13 @@ enum ServerConnection {
 }
 
 async fn setup_server_connection(app: AppHandle) -> ServerConnection {
+    // Remote-only mode: skip health checks and sidecar, just use the URL as-is.
+    // Useful when connecting to a remote server (e.g. via Tailscale).
+    if let Ok(url) = env::var("OPENCODE_REMOTE_URL") {
+        tracing::info!(%url, "Remote-only mode: using OPENCODE_REMOTE_URL");
+        return ServerConnection::Existing { url };
+    }
+
     let custom_url = get_saved_server_url(&app).await;
 
     tracing::info!(?custom_url, "Attempting server connection");
