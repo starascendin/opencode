@@ -13,6 +13,7 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import type { State, VcsCache } from "./types"
 import { trimSessions } from "./session-trim"
+import { putSessions, putMessages, putParts, deleteSessionData, deleteMessages, deleteParts } from "@/utils/idb"
 
 export function applyGlobalEvent(input: {
   event: { type: string; properties?: unknown }
@@ -39,7 +40,12 @@ export function applyGlobalEvent(input: {
   })
 }
 
-function cleanupSessionCaches(store: Store<State>, setStore: SetStoreFunction<State>, sessionID: string) {
+function cleanupSessionCaches(
+  store: Store<State>,
+  setStore: SetStoreFunction<State>,
+  sessionID: string,
+  directory: string,
+) {
   if (!sessionID) return
   const hasAny =
     store.message[sessionID] !== undefined ||
@@ -49,6 +55,9 @@ function cleanupSessionCaches(store: Store<State>, setStore: SetStoreFunction<St
     store.question[sessionID] !== undefined ||
     store.session_status[sessionID] !== undefined
   if (!hasAny) return
+
+  const messageIDs = (store.message[sessionID] ?? []).map((m) => m?.id).filter((id): id is string => !!id)
+
   setStore(
     produce((draft) => {
       const messages = draft.message[sessionID]
@@ -67,6 +76,8 @@ function cleanupSessionCaches(store: Store<State>, setStore: SetStoreFunction<St
       delete draft.session_status[sessionID]
     }),
   )
+
+  void deleteSessionData(directory, sessionID, messageIDs)
 }
 
 export function applyDirectoryEvent(input: {
@@ -77,6 +88,7 @@ export function applyDirectoryEvent(input: {
   directory: string
   loadLsp: () => void
   vcsCache?: VcsCache
+  onMessagesChanged?: (sessionID: string) => void
 }) {
   const event = input.event
   switch (event.type) {
@@ -89,6 +101,7 @@ export function applyDirectoryEvent(input: {
       const result = Binary.search(input.store.session, info.id, (s) => s.id)
       if (result.found) {
         input.setStore("session", result.index, reconcile(info))
+        void putSessions(input.directory, input.store.session.slice())
         break
       }
       const next = input.store.session.slice()
@@ -96,6 +109,7 @@ export function applyDirectoryEvent(input: {
       const trimmed = trimSessions(next, { limit: input.store.limit, permission: input.store.permission })
       input.setStore("session", reconcile(trimmed, { key: "id" }))
       if (!info.parentID) input.setStore("sessionTotal", (value) => value + 1)
+      void putSessions(input.directory, trimmed)
       break
     }
     case "session.updated": {
@@ -110,19 +124,22 @@ export function applyDirectoryEvent(input: {
             }),
           )
         }
-        cleanupSessionCaches(input.store, input.setStore, info.id)
+        cleanupSessionCaches(input.store, input.setStore, info.id, input.directory)
         if (info.parentID) break
         input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
+        void putSessions(input.directory, input.store.session.slice())
         break
       }
       if (result.found) {
         input.setStore("session", result.index, reconcile(info))
+        void putSessions(input.directory, input.store.session.slice())
         break
       }
       const next = input.store.session.slice()
       next.splice(result.index, 0, info)
       const trimmed = trimSessions(next, { limit: input.store.limit, permission: input.store.permission })
       input.setStore("session", reconcile(trimmed, { key: "id" }))
+      void putSessions(input.directory, trimmed)
       break
     }
     case "session.deleted": {
@@ -136,9 +153,10 @@ export function applyDirectoryEvent(input: {
           }),
         )
       }
-      cleanupSessionCaches(input.store, input.setStore, info.id)
+      cleanupSessionCaches(input.store, input.setStore, info.id, input.directory)
       if (info.parentID) break
       input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
+      void putSessions(input.directory, input.store.session.slice())
       break
     }
     case "session.diff": {
@@ -161,11 +179,13 @@ export function applyDirectoryEvent(input: {
       const messages = input.store.message[info.sessionID]
       if (!messages) {
         input.setStore("message", info.sessionID, [info])
+        input.onMessagesChanged?.(info.sessionID)
         break
       }
       const result = Binary.search(messages, info.id, (m) => m.id)
       if (result.found) {
         input.setStore("message", info.sessionID, result.index, reconcile(info))
+        input.onMessagesChanged?.(info.sessionID)
         break
       }
       input.setStore(
@@ -175,6 +195,7 @@ export function applyDirectoryEvent(input: {
           draft.splice(result.index, 0, info)
         }),
       )
+      input.onMessagesChanged?.(info.sessionID)
       break
     }
     case "message.removed": {
@@ -189,6 +210,9 @@ export function applyDirectoryEvent(input: {
           delete draft.part[props.messageID]
         }),
       )
+      void deleteMessages(input.directory, props.sessionID)
+      void deleteParts(input.directory, props.messageID)
+      input.onMessagesChanged?.(props.sessionID)
       break
     }
     case "message.part.updated": {
@@ -196,11 +220,13 @@ export function applyDirectoryEvent(input: {
       const parts = input.store.part[part.messageID]
       if (!parts) {
         input.setStore("part", part.messageID, [part])
+        input.onMessagesChanged?.(part.sessionID)
         break
       }
       const result = Binary.search(parts, part.id, (p) => p.id)
       if (result.found) {
         input.setStore("part", part.messageID, result.index, reconcile(part))
+        input.onMessagesChanged?.(part.sessionID)
         break
       }
       input.setStore(
@@ -210,6 +236,7 @@ export function applyDirectoryEvent(input: {
           draft.splice(result.index, 0, part)
         }),
       )
+      input.onMessagesChanged?.(part.sessionID)
       break
     }
     case "message.part.removed": {
@@ -228,6 +255,7 @@ export function applyDirectoryEvent(input: {
             if (list.length === 0) delete draft.part[props.messageID]
           }),
         )
+        void deleteParts(input.directory, props.messageID)
       }
       break
     }

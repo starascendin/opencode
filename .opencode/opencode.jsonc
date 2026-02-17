@@ -3,6 +3,7 @@
   // "enterprise": {
   //   "url": "https://enterprise.dev.opencode.ai",
   // },
+  "model": "anthropic/claude-opus-4-6",
   "provider": {
     "opencode": {
       "options": {},

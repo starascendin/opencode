@@ -6,6 +6,7 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { useGlobalSync } from "./global-sync"
 import { useSDK } from "./sdk"
 import type { Message, Part } from "@opencode-ai/sdk/v2/client"
+import { putMessages, putParts, getMessages, getParts } from "@/utils/idb"
 
 function sortParts(parts: Part[]) {
   return parts.filter((part) => !!part?.id).sort((a, b) => cmp(a.id, b.id))
@@ -165,6 +166,11 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             setMeta("limit", key, input.limit)
             setMeta("complete", key, next.complete)
           })
+          // persist to IndexedDB
+          void putMessages(input.directory, input.sessionID, next.session)
+          for (const message of next.part) {
+            void putParts(input.directory, message.id, message.part)
+          }
         })
         .finally(() => {
           setMeta("loading", key, false)
@@ -237,6 +243,25 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           const hasMessages = store.message[sessionID] !== undefined
           const hydrated = meta.limit[key] !== undefined
           if (hasSession && hasMessages && hydrated) return
+
+          // hydrate from IndexedDB cache while waiting for API
+          if (!hasMessages) {
+            getMessages(directory, sessionID).then((cached) => {
+              if (!cached?.length) return
+              if (store.message[sessionID] !== undefined) return
+              setStore("message", sessionID, reconcile(cached, { key: "id" }))
+              // also hydrate parts for each cached message
+              for (const msg of cached) {
+                if (!msg?.id) continue
+                if (store.part[msg.id] !== undefined) continue
+                getParts(directory, msg.id).then((cachedParts) => {
+                  if (!cachedParts?.length) return
+                  if (store.part[msg.id] !== undefined) return
+                  setStore("part", msg.id, reconcile(cachedParts, { key: "id" }))
+                })
+              }
+            })
+          }
 
           const count = store.message[sessionID]?.length ?? 0
           const limit = hydrated ? (meta.limit[key] ?? messagePageSize) : limitFor(count)

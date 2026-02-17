@@ -35,6 +35,7 @@ import { bootstrapDirectory, bootstrapGlobal } from "./global-sync/bootstrap"
 import { sanitizeProject } from "./global-sync/utils"
 import type { ProjectMeta } from "./global-sync/types"
 import { SESSION_RECENT_LIMIT } from "./global-sync/types"
+import { putSessions, putMessages, putParts } from "@/utils/idb"
 
 type GlobalStore = {
   ready: boolean
@@ -206,6 +207,7 @@ function createGlobalSync() {
         )
         setStore("session", reconcile(sessions, { key: "id" }))
         sessionMeta.set(directory, { limit })
+        void putSessions(directory, sessions)
       })
       .catch((err) => {
         console.error("Failed to load sessions", err)
@@ -254,6 +256,37 @@ function createGlobalSync() {
     return promise
   }
 
+  // debounced message/part persistence to IndexedDB
+  const MESSAGE_FLUSH_MS = 2000
+  const dirtyMessages = new Map<string, Set<string>>()
+  let flushTimer: ReturnType<typeof setTimeout> | undefined
+
+  function flushMessages() {
+    flushTimer = undefined
+    for (const [directory, sessionIDs] of dirtyMessages) {
+      const entry = children.children[directory]
+      if (!entry) continue
+      const store = entry[0]
+      for (const sessionID of sessionIDs) {
+        const messages = store.message[sessionID]
+        if (messages) void putMessages(directory, sessionID, messages.slice())
+        for (const msg of messages ?? []) {
+          if (!msg?.id) continue
+          const parts = store.part[msg.id]
+          if (parts) void putParts(directory, msg.id, parts.slice())
+        }
+      }
+    }
+    dirtyMessages.clear()
+  }
+
+  function markDirtyMessages(directory: string, sessionID: string) {
+    const set = dirtyMessages.get(directory) ?? new Set()
+    set.add(sessionID)
+    dirtyMessages.set(directory, set)
+    if (!flushTimer) flushTimer = setTimeout(flushMessages, MESSAGE_FLUSH_MS)
+  }
+
   const unsub = globalSDK.event.listen((e) => {
     const directory = e.name
     const event = e.details
@@ -290,10 +323,15 @@ function createGlobalSync() {
           .lsp.status()
           .then((x) => setStore("lsp", x.data ?? []))
       },
+      onMessagesChanged: (sessionID) => markDirtyMessages(directory, sessionID),
     })
   })
 
   onCleanup(unsub)
+  onCleanup(() => {
+    if (flushTimer) clearTimeout(flushTimer)
+    flushMessages()
+  })
 
   const unsubReconnect = globalSDK.onReconnect(() => {
     void bootstrap()

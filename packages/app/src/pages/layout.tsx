@@ -40,6 +40,7 @@ import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { Binary } from "@opencode-ai/util/binary"
 import { retry } from "@opencode-ai/util/retry"
+import { putMessages, putParts } from "@/utils/idb"
 import { playSound, soundSrc } from "@/utils/sound"
 import { createAim } from "@/utils/aim"
 import { Worktree as WorktreeState } from "@/utils/worktree"
@@ -720,6 +721,12 @@ export default function Layout(props: ParentProps) {
             setStore("part", message.info.id, reconcile(mergedParts, { key: "id" }))
           }
         })
+
+        // persist to IndexedDB
+        void putMessages(directory, sessionID, merged)
+        for (const message of items) {
+          void putParts(directory, message.info.id, message.parts)
+        }
       })
       .catch(() => undefined)
   }
