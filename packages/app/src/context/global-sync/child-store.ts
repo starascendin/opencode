@@ -1,5 +1,5 @@
 import { createRoot, createEffect, getOwner, onCleanup, runWithOwner, type Accessor, type Owner } from "solid-js"
-import { createStore, reconcile, type SetStoreFunction, type Store } from "solid-js/store"
+import { createStore, type SetStoreFunction, type Store } from "solid-js/store"
 import { Persist, persisted } from "@/utils/persist"
 import type { VcsInfo } from "@opencode-ai/sdk/v2/client"
 import {
@@ -14,12 +14,9 @@ import {
   type VcsCache,
 } from "./types"
 import { canDisposeDirectory, pickDirectoriesToEvict } from "./eviction"
-import { getSessions } from "@/utils/idb"
 
 export function createChildStoreManager(input: {
   owner: Owner
-  markStats: (activeDirectoryStores: number) => void
-  incrementEvictions: () => void
   isBooting: (directory: string) => boolean
   isLoadingSessions: (directory: string) => boolean
   onBootstrap: (directory: string) => void
@@ -103,7 +100,6 @@ export function createChildStoreManager(input: {
     }
     delete children[directory]
     input.onDispose(directory)
-    input.markStats(Object.keys(children).length)
     return true
   }
 
@@ -121,7 +117,6 @@ export function createChildStoreManager(input: {
     if (list.length === 0) return
     for (const directory of list) {
       if (!disposeDirectory(directory)) continue
-      input.incrementEvictions()
     }
   }
 
@@ -204,19 +199,6 @@ export function createChildStoreManager(input: {
         })
 
       runWithOwner(input.owner, init)
-      input.markStats(Object.keys(children).length)
-
-      // hydrate sessions from IndexedDB cache
-      getSessions(directory).then((cached) => {
-        if (!cached?.length) return
-        const entry = children[directory]
-        if (!entry) return
-        const store = entry[0]
-        const setStore = entry[1]
-        // only hydrate if still empty (server hasn't responded yet)
-        if (store.session.length > 0) return
-        setStore("session", reconcile(cached, { key: "id" }))
-      })
     }
     mark(directory)
     const childStore = children[directory]
