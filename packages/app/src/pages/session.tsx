@@ -10,6 +10,7 @@ import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { Mark } from "@opencode-ai/ui/logo"
 
 import { useSync } from "@/context/sync"
+import { useGlobalSDK } from "@/context/global-sdk"
 import { useLayout } from "@/context/layout"
 import { checksum, base64Encode } from "@opencode-ai/util/encode"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -37,6 +38,7 @@ export default function Page() {
   const local = useLocal()
   const file = useFile()
   const sync = useSync()
+  const globalSDK = useGlobalSDK()
   const dialog = useDialog()
   const language = useLanguage()
   const params = useParams()
@@ -303,6 +305,39 @@ export default function Page() {
     void sync.session.sync(id)
     void sync.session.todo(id)
   })
+
+  // When app returns to foreground (e.g. iOS Capacitor after backgrounding),
+  // force re-fetch session data to catch up on messages added while away.
+  {
+    let hiddenAt = 0
+    const STALE_THRESHOLD_MS = 2_000
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now()
+        return
+      }
+      if (document.visibilityState !== "visible") return
+      if (!hiddenAt || Date.now() - hiddenAt < STALE_THRESHOLD_MS) return
+      hiddenAt = 0
+      const id = params.id
+      if (!id) return
+      void sync.session.refresh(id)
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    onCleanup(() => document.removeEventListener("visibilitychange", onVisibility))
+  }
+
+  // When SSE reconnects after a disconnect, refresh the active session
+  // to catch up on messages that arrived while disconnected.
+  {
+    const unsub = globalSDK.event.listen((e) => {
+      if (e.details.type !== "server.connected") return
+      const id = params.id
+      if (!id) return
+      void sync.session.refresh(id)
+    })
+    onCleanup(unsub)
+  }
 
   createEffect(
     on(

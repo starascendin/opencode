@@ -209,6 +209,14 @@ export function SessionHeader() {
   const currentSession = createMemo(() => sync.data.session.find((s) => s.id === params.id))
   const shareEnabled = createMemo(() => sync.data.config.share !== "disabled")
   const showShare = createMemo(() => shareEnabled() && !!currentSession())
+
+  const [refreshing, setRefreshing] = createStore({ active: false })
+  const refreshSession = () => {
+    const id = params.id
+    if (!id || refreshing.active) return
+    setRefreshing("active", true)
+    sync.session.refresh(id).finally(() => setRefreshing("active", false))
+  }
   const sessionKey = createMemo(() => `${params.dir}${params.id ? "/" + params.id : ""}`)
   const view = createMemo(() => layout.view(sessionKey))
   const os = createMemo(() => detectOS(platform))
@@ -333,6 +341,18 @@ export function SessionHeader() {
           <Portal mount={mount()}>
             <div class="flex items-center gap-2">
               <StatusPopover />
+              <Show when={params.id}>
+                <Tooltip value="Refresh session" placement="bottom" gutter={8}>
+                  <IconButton
+                    icon="refresh"
+                    variant="ghost"
+                    class="titlebar-icon w-8 h-6 p-0 box-border"
+                    classList={{ "animate-spin": refreshing.active }}
+                    onClick={refreshSession}
+                    aria-label="Refresh session"
+                  />
+                </Tooltip>
+              </Show>
               <Show when={projectDirectory()}>
                 <div class="hidden xl:flex items-center">
                   <Show

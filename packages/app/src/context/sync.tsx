@@ -381,6 +381,40 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           })
         },
         more: createMemo(() => current()[0].session.length >= current()[0].limit),
+        async refresh(sessionID: string) {
+          const directory = sdk.directory
+          const client = sdk.client
+          const [, setStore] = globalSync.child(directory)
+          const key = keyFor(directory, sessionID)
+          const currentLimit = meta.limit[key] ?? messagePageSize
+
+          // force re-fetch session metadata
+          retry(() => client.session.get({ sessionID })).then((session) => {
+            const data = session.data
+            if (!data) return
+            const [, setStore] = globalSync.child(directory)
+            setStore(
+              "session",
+              produce((draft) => {
+                const match = Binary.search(draft, sessionID, (s) => s.id)
+                if (match.found) {
+                  draft[match.index] = data
+                  return
+                }
+                draft.splice(match.index, 0, data)
+              }),
+            )
+          })
+
+          // force re-fetch messages (bypasses sync's early-return guard)
+          await loadMessages({
+            directory,
+            client,
+            setStore,
+            sessionID,
+            limit: currentLimit,
+          })
+        },
         archive: async (sessionID: string) => {
           const directory = sdk.directory
           const client = sdk.client
